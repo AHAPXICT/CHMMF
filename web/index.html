@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Триангуляція</title>
+    <style>
+    body { margin: 0; text-align: center; font-family: sans-serif; }
+    canvas { border: 1px solid #ccc; position: relative;}
+    a, a:visited { color: #09f }
+    </style>
+    <script type='text/javascript' src='/eel.js'></script>
+    <script src="https://unpkg.com/delaunator@4.0.1/delaunator.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+</head>
+<body>
+
+<h2>Триангуляція</h2>
+<div style="display: flex; flex-direction: column; align-items: center; margin: 25px;">
+    <button onclick="getTriangPoints()">Побудувати графік</button>
+    <canvas id="canvas" width="1200" height="1000"></canvas>
+
+    <p>Трикутники.</p>
+
+    <p id="triangles"></p>
+
+    <p>Межі.</p>
+
+    <p id="edges"></p>
+</div>
+
+<script>
+        // ТОЧКИ ДЛЯ ПОБУДОВИ
+        var points;
+
+        var trianglesInput;
+
+        var edgesInput;
+        // var points = [[0,0,"0"],[100,10,"1"],[100,55,"2"],[0,65,"3"],[36,61,"4"],[50,5,"5"],[0,33,"6"],[68,58,"7"],[31,30,"8"],[75,7.5,"9"],[100,26,"10"],[59,31,"11"]];
+            // ВНУТРІШНІ ТОЧКИ
+        var centerPoints;
+        // var centerPoints = [
+        //     [10.44534585, 21.10478426, "0"],
+        //     [76.05197935, 38.48761253, "1"],
+        //     [27.11201252, 11.77145092, "2"],
+        //     [47.11105523, 22.19769045, "3"],
+        //     [12.10587328, 53.12274601, "4"],
+        //     [42.55026184, 40.98710312, "5"],
+        //     [89.38626997, 46.39470634, "6"],
+        //     [22.55121913, 41.5608636, "7" ],
+        //     [54.82451929, 50.2770252, "8" ],
+        //     [78.33237605, 21.59290619, "9"],
+        //     [91.66666667, 14.5    , "10"   ],
+        //     [61.66570938, 14.59290619, "11"]
+        // ];
+    async function getTriangPoints(){
+        points = await eel.getTriangPoints()();
+        getTrianglePoints();
+    }
+
+    async function getTrianglePoints(){
+        trianglesInput = await eel.getTrianglePoints()();
+        getEdges();
+    }
+
+    async function getEdges(){
+        edgesInput = await eel.getEdges()();
+        getTriangCenterPoints();
+    }
+
+    async function getTriangCenterPoints(){
+        centerPoints = await eel.getTriangCenterPoints()();
+        drawGraph();
+    }
+    
+    function drawGraph(){
+
+    var trianglesOutput = trianglesInput.toString();
+    var edgesOutput = edgesInput.toString();
+
+
+    console.log("Тикутники" + trianglesInput);
+    console.log("Межі" + edgesInput);
+
+    document.getElementById("triangles").innerHTML = trianglesInput;
+    document.getElementById("edges").innerHTML = edgesInput;
+
+    var delaunay = Delaunator.from(points);
+    
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+    
+    
+    // ГРАНИЦІ
+    var minX = Infinity;
+    var minY = Infinity;
+    var maxX = -Infinity;
+    var maxY = -Infinity;
+    for (var i = 0; i < points.length; i++) {
+        var x = points[i][0];
+        var y = points[i][1];
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+    }
+    
+    // ПОЛЕ
+    var padding = 20;
+    var w = 1024;
+    var h = (w - 2 * padding) * (maxY - minY) / (maxX - minX) + 2 * padding;
+    
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    
+    canvas.width = w;
+    canvas.height = h;
+    
+    if (window.devicePixelRatio >= 2) {
+        canvas.width = w * 2;
+        canvas.height = h * 2;
+        ctx.scale(2, 2);
+    }
+    
+    var ratio = (w - 2 * padding) / Math.max(maxX - minX, maxY - minY);
+    
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    
+    var updated = true;
+    
+    // canvas.onmousedown = function (e) {
+    //     points.push([
+    //         (e.layerX - padding) / ratio + minX,
+    //         (e.layerY - padding) / ratio + minY
+    //     ]);
+    //     console.time('delaunay');
+    //     delaunay = Delaunator.from(points);
+    //     console.timeEnd('delaunay');
+    //     updated = true;
+    // }
+    function getX(i) {
+        return padding + ratio * (points[i][0] - minX);
+    }
+    function getY(i) {
+        return padding + ratio * (points[i][1] - minY);
+    }
+    
+    function getCenterX(i) {
+        return padding + ratio * (centerPoints[i][0] - minX);
+    }
+    function getCenterY(i) {
+        return padding + ratio * (centerPoints[i][1] - minY);
+    }
+    
+    function frame() {
+        requestAnimationFrame(frame);
+        draw();
+    }
+    frame();
+    
+    function draw() {
+        if (!updated) return;
+        updated = false;
+    
+        ctx.clearRect(0, 0, w, h);
+    
+        var triangles = delaunay.triangles;
+    
+        // МАЛЮВАННЯ ТРИКУТНИКІВ
+        ctx.beginPath();
+        for (var i = 0; i < triangles.length; i += 3) {
+            var p0 = triangles[i];
+            var p1 = triangles[i + 1];
+            var p2 = triangles[i + 2];
+            ctx.moveTo(getX(p0), getY(p0));
+            ctx.lineTo(getX(p1), getY(p1));
+            ctx.lineTo(getX(p2), getY(p2));
+            ctx.closePath();
+        }
+        ctx.strokeStyle = 'rgba(0,200,0,1)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,0,0.1)';
+        ctx.fill();
+    
+        // МАЛЮВАННЯ ГРАНИЦЬ
+        ctx.beginPath();
+        for (const i of delaunay.hull) {
+            ctx.lineTo(getX(i), getY(i));
+        }
+        ctx.closePath();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'red';
+        ctx.stroke();
+    
+        // МАЛЮВАННЯ ТОЧОК ТРИАНГУЛЯЦІЇ
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        for (var i = 0; i < points.length; i++) {
+            ctx.rect(getX(i) - 1.5, getY(i) - 1.5, 3, 3);
+            ctx.font = "20px Georgia";
+            
+            ctx.fillText(points[i][2], getX(i) - 1.5, getY(i) - 1.5);
+        }
+        // ВНУТРІШНІ ТОЧКИ ТРИКУТНИКА
+        for (var i = 0; i < centerPoints.length; i++) {
+            ctx.rect(getCenterX(i) - 1.5, getCenterY(i) - 1.5, 3, 3);
+            ctx.font = "20px Georgia";
+            ctx.fillText(centerPoints[i][2], getCenterX(i) - 1.5, getCenterY(i) - 1.5);
+        }
+        ctx.fill();
+    
+    
+    }
+    }
+    
+    </script>
+
+</body>
+</html>
